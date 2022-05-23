@@ -1,0 +1,9 @@
+*.exe
+*.csv
+*.h5
+*.pdf
+*.docx
+*.pptx
+*.pickle
+.ipynb_checkpoints/
+.src/
