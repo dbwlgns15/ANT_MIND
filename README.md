@@ -163,4 +163,5 @@
 - [SKTbrain팀 KoBERT 실습사례 네이버 영화리뷰 감성분석](https://github.com/SKTBrain/KoBERT/blob/master/scripts/NSMC/naver_review_classifications_pytorch_kobert.ipynb)
 - [BERT모델을 이용해서 금융뉴스 긍부정 분석](https://github.com/ukairia777/finance_sentiment_corpus/blob/main/BERT_sentiment_analysis_kor.ipynb)
 - [BERT모델을 이용해서 주52시간근무제 관련 댓글 감성분석](https://projectlog-eraser.tistory.com/25)
+- [tensorflow-nlp-tutorial/18-4. kor_bert_nsmc_model_from_transformers_gpu.ipynb at main · ukairia777/tensorflow-nlp-tutorial (github.com)](https://github.com/ukairia777/tensorflow-nlp-tutorial/blob/main/18. Fine-tuning BERT (Cls%2C NER%2C NLI)/18-4. kor_bert_nsmc_model_from_transformers_gpu.ipynb)
 
