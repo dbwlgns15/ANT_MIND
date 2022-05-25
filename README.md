@@ -143,15 +143,49 @@
 
   ![레이블링](./img/레이블링.jpeg)
 
-## 3. BERT모델 학습
+## 3. 지도 학습 분석 - LSTM
 
 - 코랩에서 세팅
 
 
 
-## 4.
+## 4. 사전 학습 모델 - BERT 
 
+원래는 BERT 모델을 사용해서 종목토론실 댓글에 맞게 모델을 미세조정(Fine-Tuning)을 진행하려 했으나, 코랩에서 수 많은 에러 및 구동제한, 학습에 걸리는 굉장히 긴 시간, 그렇게 학습시킨 모델의 처참하게 좋지 않은 성능으로 인해서 포기하게 되었다. 그 대신, [Hugging Face](https://huggingface.co/)를 이용해서 사전에 미세조정이 완료된 모델중 네이버 종목토론실 댓글의 감성분석에 맞는 모델을 찾아서 분석하기로 결정했다.
 
+- BERT 미세조정 모델 ([sangrimlee/bert-base-multilingual-cased-nsmc](https://huggingface.co/sangrimlee/bert-base-multilingual-cased-nsmc))
+
+  ```python
+  from transformers import pipeline
+  # 모델 불러오기
+  classifier = pipeline("sentiment-analysis", 
+      model="sangrimlee/bert-base-multilingual-cased-nsmc")
+  # 모델 저장
+  classifier.save_pretrained('./src/bert')
+  ```
+
+- 저장된 모델 불러오기
+
+  ```python
+  from transformers import TextClassificationPipeline
+  from transformers import BertTokenizerFast
+  from transformers import TFBertForSequenceClassification
+  # 토크나이저 와 모델 불러오기
+  loaded_tokenizer = BertTokenizerFast.from_pretrained('./src/bert',from_pt=True)
+  loaded_model = TFBertForSequenceClassification.from_pretrained('./src/bert',
+                                                                 from_pt=True)
+  # 파이프라인 생성
+  classifier = TextClassificationPipeline(
+      tokenizer=loaded_tokenizer, 
+      model=loaded_model, 
+      framework='tf',
+      return_all_scores=True)
+  ```
+
+- 모델 적용 예시
+  ![bert](./img/BERT.jpeg)
+
+# 5. 오늘의 종목토론실 댓글 공포/탐욕지수 분석
 
 
 
@@ -166,10 +200,6 @@
 - [SKTbrain팀 KoBERT 실습사례 네이버 영화리뷰 감성분석](https://github.com/SKTBrain/KoBERT/blob/master/scripts/NSMC/naver_review_classifications_pytorch_kobert.ipynb)
 
 - [BERT모델을 이용해서 금융뉴스 긍부정 분석](https://github.com/ukairia777/finance_sentiment_corpus/blob/main/BERT_sentiment_analysis_kor.ipynb)
-
-- [BERT모델을 이용해서 주52시간근무제 관련 댓글 감성분석](https://projectlog-eraser.tistory.com/25)
-
-  [링크]: https://github.com/ukairia777/tensorflow-nlp-tutorial/blob/main/18. Fine-tuning BERT (Cls%2C NER%2C NLI)/18-4. kor_bert_nsmc_model_from_transformers_gpu.ipynb
 
   
 
