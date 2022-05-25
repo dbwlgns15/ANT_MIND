@@ -18,7 +18,7 @@
 
    감성분석은 크게 두가지로 분류될 수 있다. 첫번째는 어휘 기반 분석, 두번째는 머신 러닝 분석이다.  이번 프로젝트에서 사용하는 비정형 데이터인 네이버 금융 종목토론실 댓글의 감정(공포/탐욕) 분석을 진행할 예정이다.하지만 이러한 데이터에는 현재 공포/탐욕 레이블링이 되어있는 학습데이터가 존재하지 않다. 그렇기 때문에 머신 러닝 분석에서 비지도 학습을 진행하거나, 어휘 기반 분석을 진행해야만 한다. 나는 지도 학습으로 분석을 하고 싶기 때문에, 내가 직접 공포/탐욕 단어 메뉴얼을 만들어서 어휘 기반 분석을 진행해서 학습데이터를 생성한 뒤, 그 데이터로 지도 학습을 진행할 계획이다. 지도학습은 LSTM과 최근 성능이 좋다고 유명한 BERT모델을 이용해서 학습할 계획이다.
 
-- #### 플로우차트
+- #### 시스템 플로우차트
 
    ![총플로우](./img/총플로우.png)
 
@@ -170,6 +170,7 @@
   ![정수토큰화](./img/정수토큰화.jpeg)
 
 - 패딩, 레이블인코딩을 진행한 후 모델 학습을 한다. 그리고 모델을 저장한다
+  
   ![lstm](./img/LSTM.jpeg)
 
 ## 4. BERT 모델 학습
@@ -209,11 +210,136 @@
 
   ![bert](./img/BERT.jpeg)
 
-# 5. 오늘의 종목토론실 댓글 공포/탐욕지수 분석
+# 5. 오늘의 공포/탐욕지수
 
+- #### 사용자 플로우
 
+  ![사용자플로우](./img/사용자플로우.png)
 
-참고문헌
+- #### 공포/탐욕 지수 분석 결과
+
+  ![공포탐욕](./img/공포탐욕.jpeg)
+
+- #### 상세 코드
+
+  ```python
+  def get_code(symbol):
+      krx = pd.read_csv('./src/krx_code.csv')
+      krx = krx.set_index('한글 종목약명')
+      try:
+          code = krx.at[symbol,'단축코드']
+          return code
+      except:
+          print('종목명을 다시 확인해주세요.')
+          return 0
+  
+  def get_today():
+      today = date.today().isoformat()
+      return today
+  
+  def get_comment(symbol):
+      code = get_code(symbol)
+      today = get_today()
+      comment_list = []
+      raw_comment_list = []
+      chk = 1
+      i = 1
+      while chk:  
+          url = f'https://finance.naver.com/item/board.naver?code={code}&page={i}'
+          headers = {'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Safari/537.36 Edg/100.0.1185.50'}
+          res = requests.get(url, headers = headers)
+          bs = BeautifulSoup(res.text, 'html.parser')  
+          for j in range(20):
+              try:
+                  root = bs.find('div',{'class':'section inner_sub'}).find_all('tr',{'onmouseover':'mouseOver(this)'})[j].text.split('\n') 
+                  if today != root[1].split()[0].replace('.','-'):
+                      chk = 0
+                      break
+                  if len(root) == 14: # 답글
+                      pass      
+                  elif len(root) == 13: # 기본
+                      comment = root[3]
+                      raw_comment_list.append(comment)
+                      comment = re.sub('\[삭제된 게시물의 답글\]',' ',comment)
+                      comment = re.sub('[^가-힣]',' ',comment)
+                      comment = re.sub(' +',' ',comment)
+                      comment = comment.strip()
+                      if comment == '':
+                          pass
+                      else:
+                          comment_list.append(comment)                 
+                  else: # 에러
+                      pass
+              except: # 에러
+                  pass
+              print(f'\r{today} 댓글{len(comment_list)}개 크롤링중..',end='')
+          i += 1
+          if chk == 0:
+              break   
+      print(f'\r{today} 댓글{len(comment_list)}개 크롤링완료')
+      return comment_list, raw_comment_list
+  
+  def BERT_feargreed(symbol):
+      comment_list, raw_comment_list = get_comment(symbol)
+  
+      loaded_tokenizer = BertTokenizerFast.from_pretrained('./src/bert', from_pt=True)
+      loaded_model = TFBertForSequenceClassification.from_pretrained('./src/bert', from_pt=True)
+      classifier = TextClassificationPipeline(tokenizer=loaded_tokenizer, model=loaded_model,
+                                              framework='tf', return_all_scores=True)    
+      pred_list=[]
+      for i in raw_comment_list[:50]:
+          f = classifier(i)[0][0]['score']
+          g = classifier(i)[0][1]['score']
+          if f >= g:
+              pred_list.append(1-f)
+          else:
+              pred_list.append(g)
+          print(f'\rBERT모델 댓글{len(pred_list)}개 분석중..',end='')
+      print(f'\r{symbol} BERT 공포탐욕지수: {int(sum(pred_list)/len(pred_list)*100)}%')    
+      return comment_list
+  
+  def konlpy_okt(symbol):
+      okt = Okt()
+      tag_list = ['Noun','Verb','Adjective','VerbPrefix'] 
+      comment_list = BERT_feargreed(symbol)
+      print('분석 진행중..',end='')
+      tokenized_data = []
+      for i in range(len(comment_list)):
+          tokenized_sentence = okt.pos(comment_list[i], stem=True) 
+          tag_checked_sentence = []
+          for j in tokenized_sentence:
+              x,y = j
+              if y in tag_list:
+                  tag_checked_sentence.append(x)
+          if tag_checked_sentence == []:
+              pass
+          else:
+              tokenized_data.append(tag_checked_sentence)     
+      for i in tokenized_data:
+          for j in range(len(i)):
+              i[j] = "'"+i[j]+"'"
+      return tokenized_data
+      
+  def tokenize(symbol):
+      with open('./src/tokenizer.pickle', 'rb') as handle:
+          tokenizer = pickle.load(handle)   
+      tokenized_data = konlpy_okt(symbol)
+      test = tokenizer.texts_to_sequences(tokenized_data)
+      test = pad_sequences(test, maxlen=15)
+      return test
+  
+  def feargreed_index(symbol):
+      if get_code(symbol) == 0:
+          return    
+      model = load_model('./src/model.h5')
+      test = tokenize(symbol)
+      pred = model.predict(test)
+      print(f'\r{symbol} LSTM 공포탐욕지수: {int(pred.mean()*100)}%')참고문헌
+  ```
+
+-----------
+
+## 참고문헌
 
 - [감성 분석 참고 블로그](https://yngie-c.github.io/nlp/2020/07/31/sentiment_analysis/)
 
